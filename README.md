@@ -161,14 +161,6 @@ grunt.initConfig({
 })
 ```
 
-options: {
-                    imports: false,
-                    logCount: 'warn'
-                },
-                src: [
-                    '<%= cssBundlesDir %>/**/*.css'
-                ]
-
 Contributing
 ------------
 
