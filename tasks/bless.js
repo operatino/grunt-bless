@@ -8,45 +8,46 @@
 'use strict';
 
 module.exports = function(grunt) {
-	var path = require('path');
-	var bless = require('bless');
+    var path = require('path');
+    var bless = require('bless');
     var util = require('util');
     var chalk = require('chalk');
     var OVERWRITE_ERROR = 'The destination is the same as the source for file ';
     var OVERWRITE_EXCEPTION = 'Cowardly refusing to overwrite the source file.';
 
-	grunt.registerMultiTask('bless', 'Split CSS files suitable for IE', function() {
+    grunt.registerMultiTask('bless', 'Split CSS files suitable for IE', function() {
 
-		var options = this.options({
-			cacheBuster: true,
-			cleanup: true,
-			compress: false,
+        var options = this.options({
+            cacheBuster: true,
+            cleanup: true,
+            compress: false,
             logCount: false,
-			force: grunt.option('force') || false,
-			imports: true
-		});
-		grunt.log.writeflags(options, 'options');
+            force: grunt.option('force') || false,
+            warnLimit: 4000,
+            imports: true
+        });
+        grunt.log.writeflags(options, 'options');
 
         // Taking list of files with write destination or list without dest
         var files = this.files;
         var fileList = files.length === 1 && !files[0].dest ? files[0].src : files;
 
-		grunt.util.async.forEach(fileList, function (inputFile, next) {
+        grunt.util.async.forEach(fileList, function (inputFile, next) {
             var writeFiles = inputFile.dest ? true : false;
             var outPutfileName = inputFile.dest || inputFile;
             var limit = 4095;
-			var data = '';
+            var data = '';
 
-			// If we are not forcing the build refuse to overwrite the
-			// source file.
+            // If we are not forcing the build refuse to overwrite the
+            // source file.
             if (writeFiles) {
                 if (!options.force && inputFile.src.indexOf(inputFile.dest) >= 0) {
                     grunt.log.error(OVERWRITE_ERROR + inputFile.dest);
                     throw grunt.util.error(OVERWRITE_EXCEPTION);
                 }
-			}
+            }
 
-			// Read and concat files
+            // Read and concat files
             if (util.isArray(inputFile.src)) {
                 inputFile.src.forEach(function (file) {
                     data += grunt.file.read(file);
@@ -56,39 +57,48 @@ module.exports = function(grunt) {
             }
 
 
-			new (bless.Parser)({
-				output: outPutfileName,
-				options: options
-			}).parse(data, function (err, files, numSelectors) {
-				if (err) {
-					grunt.log.error(err);
-					throw grunt.util.error(err);
-				}
+            new (bless.Parser)({
+                output: outPutfileName,
+                options: options
+            }).parse(data, function (err, files, numSelectors) {
+                if (err) {
+                    grunt.log.error(err);
+                    throw grunt.util.error(err);
+                }
 
                 if (options.logCount) {
-                    var coungMsg = path.basename(outPutfileName) + ' has ' + numSelectors + ' CSS selectors.';
+                    var overLimit = numSelectors > limit;
+                    var _numSelectors = chalk.green(numSelectors);
 
-                    if (numSelectors > limit) {
+                    if (overLimit) {
+                        _numSelectors = chalk.red(numSelectors);
+                    } else if (numSelectors > options.warnLimit ) {
+                        _numSelectors = chalk.yellow(numSelectors);
+                    }
+
+                    var coungMsg = path.basename(outPutfileName) + ' has ' + _numSelectors + ' CSS selectors.';
+
+                    if (overLimit) {
                         grunt.log.errorlns(coungMsg + ' IE8-9 will read only first ' + limit + '!');
                     } else if (options.logCount !== 'warn') {
                         grunt.log.oklns(coungMsg);
                     }
                 }
 
-				// print log message
-				var msg = 'Found ' + numSelectors + ' selector';
-				if (numSelectors !== 1) {
-					msg += 's';
-				}
-				msg += ', ';
-				if (files.length > 1) {
-					msg += 'splitting into ' + files.length + ' files.';
-				} else {
-					msg += 'not splitting.';
-				}
-				grunt.log.verbose.writeln(msg);
+                // print log message
+                var msg = 'Found ' + numSelectors + ' selector';
+                if (numSelectors !== 1) {
+                    msg += 's';
+                }
+                msg += ', ';
+                if (files.length > 1) {
+                    msg += 'splitting into ' + files.length + ' files.';
+                } else {
+                    msg += 'not splitting.';
+                }
+                grunt.log.verbose.writeln(msg);
 
-				// write processed file(s)
+                // write processed file(s)
                 if (writeFiles) {
                     var filesLength = files.length;
                     var logSplitted = filesLength > 1 ? true : false;
@@ -116,8 +126,8 @@ module.exports = function(grunt) {
                         }
                     });
                 }
-			});
-			next();
-		});
-	});
+            });
+            next();
+        });
+    });
 };
